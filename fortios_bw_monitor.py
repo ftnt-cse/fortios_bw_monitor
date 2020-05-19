@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/local/bin/python
 # -*- coding: utf-8 -*-
 """ FortiSIEM Remediation script : Reboot FortiGate via API
 PS: THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND
@@ -32,54 +32,54 @@ api_port=sys.argv[6]
 
 #Config
 monitored_vdoms={
-	'vdom1':{'port2':{'tx':0,'rx':0},'port3':{'tx':0,'rx':0}},
-	'vdom2':{'port4':{'tx':0,'rx':0},'port5':{'tx':0,'rx':0}},
-	'vdom3':{'port2':{'tx':0,'rx':0},'port5':{'tx':0,'rx':0}},        
+    'vdom1':{'port2':{'tx':0,'rx':0},'port3':{'tx':0,'rx':0}},
+    'vdom2':{'port4':{'tx':0,'rx':0},'port5':{'tx':0,'rx':0}},
+    'vdom3':{'port2':{'tx':0,'rx':0},'port5':{'tx':0,'rx':0}},        
 }
 #
 def send_syslog(server,syslog):
-	syslogger = logging.getLogger('syslogger')
-	syslogger.setLevel(logging.INFO)
-	#UDP
-	handler = logging.handlers.SysLogHandler(address = (server,514),  socktype=socket.SOCK_DGRAM)
-	syslogger.addHandler(handler)
-	syslogger.info(syslog)
-	syslogger.handlers[0].flush()
+    syslogger = logging.getLogger('syslogger')
+    syslogger.setLevel(logging.INFO)
+    #UDP
+    handler = logging.handlers.SysLogHandler(address = (server,514),  socktype=socket.SOCK_DGRAM)
+    syslogger.addHandler(handler)
+    syslogger.info(syslog)
+    syslogger.handlers[0].flush()
 
 def perf_intf_parser(perf_data):
-	perf_data=json.loads(perf_data)
-	if perf_data['status'] != 'success':
-		return None
-	bps_rx = list(map(lambda x : x['bps'], perf_data['results']['rx']))
-	bps_tx = list(map(lambda x : x['bps'], perf_data['results']['tx']))
-	return sum(bps_rx) / len(bps_rx),sum(bps_tx) / len(bps_tx)
+    perf_data=json.loads(perf_data)
+    if perf_data['status'] != 'success':
+        return None
+    bps_rx = list(map(lambda x : x['bps'], perf_data['results']['rx']))
+    bps_tx = list(map(lambda x : x['bps'], perf_data['results']['tx']))
+    return sum(bps_rx) / len(bps_rx),sum(bps_tx) / len(bps_tx)
 
 def perf_vdom_parser(perf_data):
-	bps_rx = [perf_data[port]['rx'] for port in perf_data]
-	bps_tx = [perf_data[port]['tx'] for port in perf_data]
-	return sum(bps_rx),sum(bps_tx)
+    bps_rx = [perf_data[port]['rx'] for port in perf_data]
+    bps_tx = [perf_data[port]['tx'] for port in perf_data]
+    return sum(bps_rx),sum(bps_tx)
 
 class FortiGateRebootRemediation(HttpRemediation):
-	def run_remediation(self, args):
-		fgt = FortiOSREST()
-		#fgt.debug('on')
-		fgt.login(self.mAccessIp, self.mPort, self.mUser, self.mPassword)
+    def run_remediation(self, args):
+        fgt = FortiOSREST()
+        #fgt.debug('on')
+        fgt.login(self.mAccessIp, self.mPort, self.mUser, self.mPassword)
 
-		for vdom in monitored_vdoms:
-			for port in monitored_vdoms[vdom]:
-				response = fgt.get('monitor', 'system', 'traffic-history?interface='+port+'&time_period=hour', parameters={'vdom': 'root'})
-				monitored_vdoms[vdom][port]['rx'],monitored_vdoms[vdom][port]['tx']=perf_intf_parser(response)
-			print(monitored_vdoms[vdom])
-			vdom_rx,vdom_tx=perf_vdom_parser(monitored_vdoms[vdom])
-			syslog='[PH_DEV_MON_INTF_USAGE_TOTAL]:[eventSeverity]=PHL_INFO,[fileName]=bw_collector.py,[lineNumber]=0,[hostName]='+str(vdom)+',[hostIpAddr]='+str(host_ip)+',[pollIntv]=0,[recvBitsPerSec]='+str(vdom_rx)+',[sentBitsPerSec]='+str(vdom_tx)+',[recvPkts64]=0,[sentPkts64]=0,[phLogDetail]=collected_by_bw_collector'
-			print('Sending: ',syslog)
-			send_syslog('127.0.0.1',syslog)
-			
+        for vdom in monitored_vdoms:
+            for port in monitored_vdoms[vdom]:
+                response = fgt.get('monitor', 'system', 'traffic-history?interface='+port+'&time_period=hour', parameters={'vdom': 'root'})
+                monitored_vdoms[vdom][port]['rx'],monitored_vdoms[vdom][port]['tx']=perf_intf_parser(response)
+            print(monitored_vdoms[vdom])
+            vdom_rx,vdom_tx=perf_vdom_parser(monitored_vdoms[vdom])
+            syslog='[PH_DEV_MON_INTF_USAGE_TOTAL]:[eventSeverity]=PHL_INFO,[fileName]=bw_collector.py,[lineNumber]=0,[hostName]='+str(vdom)+',[hostIpAddr]='+str(host_ip)+',[pollIntv]=0,[recvBitsPerSec]='+str(vdom_rx)+',[sentBitsPerSec]='+str(vdom_tx)+',[recvPkts64]=0,[sentPkts64]=0,[phLogDetail]=collected_by_bw_collector'
+            print('Sending: ',syslog)
+            send_syslog('127.0.0.1',syslog)
+            
 
-		#self.log.info("returned by FortiGate:\n%s" % response)
-		fgt.logout()
-		exit(0)
+        #self.log.info("returned by FortiGate:\n%s" % response)
+        fgt.logout()
+        exit(0)
 
 if __name__ == "__main__":
-	remediation = FortiGateRebootRemediation()
-	remediation.execute(sys.argv)
+    remediation = FortiGateRebootRemediation()
+    remediation.execute(sys.argv)
